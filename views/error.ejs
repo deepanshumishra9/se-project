@@ -1,0 +1,10 @@
+<%- include('partials/header') %> 
+
+<div class="error-page">   
+  <div class="error-code"><%= statusCode || 500 %></div>   
+  <h1 class="error-title"><%= title || 'Something went wrong' %></h1>   
+  <p class="error-message"><%= message || 'An unexpected error occurred.' %></p>   
+  <a href="/" class="error-home-btn">← Back to Library</a> 
+</div>  
+
+<%- include('partials/footer') %>

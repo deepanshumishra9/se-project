@@ -1,0 +1,117 @@
+<%# views/partials/header.ejs — reusable HTML head + nav included in every page %>
+<%# Variables available: user, title, success_messages, error_messages (from res.locals) %>
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title || 'Open Library Direct' %></title>
+  <meta name="description" content="Search, read, and download 70,000+ free public domain books">
+
+  <!-- Google Fonts — loaded async to not block rendering -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Space+Mono:wght@400;700&family=Lora:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+
+  <!-- Main stylesheet -->
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/reader.css">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
+</head>
+<body>
+
+<!-- ── TOP NAVIGATION BAR ───────────────────────────────────────────────────── -->
+<nav class="topnav" id="topnav">
+  <div class="nav-inner">
+
+    <!-- Logo / Brand -->
+    <a href="/" class="nav-brand">
+      <span class="nav-brand-icon">📚</span>
+      Open <em>Library</em>
+    </a>
+
+    <!-- Right side: user controls -->
+    <div class="nav-right">
+
+      <% if (user) { %>
+        <!-- ── LOGGED IN: Show notifications + profile ──── -->
+
+        <!-- Notifications Bell -->
+        <button class="nav-btn notif-btn" id="notif-btn" aria-label="Notifications">
+          🔔
+          <span class="notif-badge" id="notif-badge" style="display:none">0</span>
+        </button>
+
+        <!-- Theme Toggle -->
+        <button class="nav-btn theme-toggle-btn" id="theme-toggle" aria-label="Toggle theme">
+          🌙
+        </button>
+
+        <!-- User Profile Dropdown -->
+        <div class="nav-profile" id="nav-profile">
+          <button class="profile-trigger" id="profile-trigger">
+            <% if (user.avatar) { %>
+              <img src="<%= user.avatar %>" alt="<%= user.username %>" class="profile-avatar">
+            <% } else { %>
+              <span class="profile-initial"><%= user.username[0].toUpperCase() %></span>
+            <% } %>
+            <span class="profile-name"><%= user.username %></span>
+            <span class="dropdown-arrow">▾</span>
+          </button>
+
+          <div class="profile-dropdown" id="profile-dropdown">
+            <a href="/profile" class="dropdown-item">👤 Profile & Stats</a>
+            <a href="/bookmarks"  class="dropdown-item">🔖 My Bookmarks</a>
+            <a href="/history"    class="dropdown-item">📖 Reading History</a>
+            <a href="/goals"      class="dropdown-item">🎯 Reading Goals</a>
+            <div class="dropdown-divider"></div>
+            <form action="/auth/logout" method="POST" style="margin:0">
+              <button type="submit" class="dropdown-item dropdown-logout">
+                🚪 Sign Out
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Notifications Dropdown Panel -->
+        <div class="notif-panel" id="notif-panel">
+          <div class="notif-header">
+            <span>Notifications</span>
+            <button class="notif-read-all" id="notif-read-all">Mark all read</button>
+          </div>
+          <div class="notif-list" id="notif-list">
+            <div class="notif-empty">Loading...</div>
+          </div>
+        </div>
+
+      <% } else { %>
+        <!-- ── LOGGED OUT: Show login/register buttons ── -->
+        <button class="nav-btn theme-toggle-btn" id="theme-toggle" aria-label="Toggle theme">
+          🌙
+        </button>
+        <a href="/auth/login"    class="nav-link">Sign In</a>
+        <a href="/auth/register" class="nav-btn-primary">Get Started</a>
+      <% } %>
+
+    </div>
+  </div>
+</nav>
+
+<!-- ── FLASH MESSAGES ──────────────────────────────────────────────────────── -->
+<!-- Flash messages appear at the top and auto-dismiss after 4 seconds -->
+<div class="flash-container" id="flash-container">
+  <% if (success_messages && success_messages.length) { %>
+    <% success_messages.forEach(msg => { %>
+      <div class="flash flash-success">✅ <%= msg %></div>
+    <% }) %>
+  <% } %>
+  <% if (error_messages && error_messages.length) { %>
+    <% error_messages.forEach(msg => { %>
+      <div class="flash flash-error">❌ <%= msg %></div>
+    <% }) %>
+  <% } %>
+</div>
+
+<!-- Page content goes here -->

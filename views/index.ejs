@@ -1,0 +1,240 @@
+<%# views/index.ejs — Main application page %>
+<%- include('partials/header') %>
+
+<!-- ── HERO / SEARCH SECTION ────────────────────────────────────────────────── -->
+<header class="hero">
+  <div class="hero-bg-glow"></div>
+
+  <div class="brand">
+    Open <span>Library</span> Direct
+  </div>
+  <div class="tagline">Search · Discover · <b>Read & Download Instantly</b></div>
+
+  <!-- Search Bar -->
+  <div class="search-wrap">
+    <div class="search-bar" id="search-bar">
+      <input
+        type="text"
+        id="q"
+        placeholder="Search title, author, topic…"
+        value="<%= initialSearch || '' %>"
+        autocomplete="off"
+        aria-label="Search books"
+      >
+      <button onclick="search()" aria-label="Search">Search</button>
+    </div>
+
+    <!-- Quick Topic Chips -->
+    <div class="chip-row" id="chip-row">
+      <button class="chip active" data-topic="">All</button>
+      <button class="chip" data-topic="fiction">Fiction</button>
+      <button class="chip" data-topic="science">Science</button>
+      <button class="chip" data-topic="history">History</button>
+      <button class="chip" data-topic="philosophy">Philosophy</button>
+      <button class="chip" data-topic="adventure">Adventure</button>
+      <button class="chip" data-topic="mystery">Mystery</button>
+      <button class="chip" data-topic="romance">Romance</button>
+      <button class="chip" data-topic="poetry">Poetry</button>
+    </div>
+  </div>
+</header>
+
+<!-- ── TAB NAVIGATION (Search / Recommendations / History) ──────────────────── -->
+<div class="main-tabs-wrap" id="main-tabs-wrap">
+  <div class="main-tabs">
+    <button class="main-tab active" data-tab="search" onclick="switchMainTab('search', this)">
+      🔍 Search
+    </button>
+    <% if (user) { %>
+      <button class="main-tab" data-tab="recommendations" onclick="switchMainTab('recommendations', this)">
+        ✨ For You
+      </button>
+      <button class="main-tab" data-tab="history" onclick="switchMainTab('history', this)">
+        📖 Continue Reading
+      </button>
+    <% } %>
+  </div>
+</div>
+
+<!-- ── META BAR (result count) ───────────────────────────────────────────────── -->
+<div class="meta-bar" id="meta-bar" style="display:none">
+  <span id="meta-text"></span>
+  <span class="verified-tag">✓ Guaranteed Download Links</span>
+</div>
+
+<!-- ── BOOK GRID ─────────────────────────────────────────────────────────────── -->
+<main>
+  <!-- Search Results Tab -->
+  <div id="tab-search" class="tab-content active">
+    <div id="book-grid" class="book-grid">
+      <div class="state-msg">
+        <div class="spinner"></div>
+        Loading books…
+      </div>
+    </div>
+    <div class="pagination" id="pagination" style="display:none">
+      <button class="pg-btn" id="prev-btn" onclick="changePage(-1)" disabled>← Prev</button>
+      <span class="pg-info" id="pg-info"></span>
+      <button class="pg-btn" id="next-btn" onclick="changePage(1)">Next →</button>
+    </div>
+  </div>
+
+  <!-- Recommendations Tab (only for logged-in users) -->
+  <% if (user) { %>
+  <div id="tab-recommendations" class="tab-content">
+    <div class="section-intro">
+      <h2>Recommended for You</h2>
+      <p>Based on your reading history and preferences</p>
+    </div>
+    <div id="rec-grid" class="book-grid">
+      <div class="state-msg">
+        <div class="spinner"></div>
+        Analyzing your reading history…
+      </div>
+    </div>
+  </div>
+
+  <!-- Continue Reading Tab -->
+  <div id="tab-history" class="tab-content">
+    <div class="section-intro">
+      <h2>Continue Reading</h2>
+      <p>Pick up where you left off</p>
+    </div>
+    <div id="history-grid" class="book-grid">
+      <div class="state-msg">Loading your reading history…</div>
+    </div>
+  </div>
+  <% } %>
+</main>
+
+<!-- ════════════════════════════════════════════════════════
+     BOOK MODAL — Opens when you click on a book card
+     ════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-overlay" onclick="handleOverlayClick(event)">
+  <div class="modal" id="modal" role="dialog" aria-modal="true">
+
+    <!-- Modal Header: cover thumbnail + title + close button -->
+    <div class="modal-bar">
+      <img class="modal-cover" id="m-cover" src="" alt="">
+      <div class="modal-info">
+        <div class="modal-title"  id="m-title"></div>
+        <div class="modal-author" id="m-author"></div>
+      </div>
+      <div class="modal-actions">
+        <!-- Bookmark button — saves book to "read later" list -->
+        <button class="modal-action-btn bookmark-btn" id="modal-bookmark-btn"
+                onclick="toggleBookmark()" title="Save to bookmarks">
+          🔖
+        </button>
+        <button class="modal-close" onclick="closeModal()" aria-label="Close">✕</button>
+      </div>
+    </div>
+
+    <!-- Modal Tab Navigation -->
+    <div class="modal-tabs">
+      <button class="tab-btn active" id="tb-read"     onclick="switchTab('read',this)">📖 Read Online</button>
+      <button class="tab-btn"        id="tb-download" onclick="switchTab('download',this)">⬇ Download</button>
+      <button class="tab-btn"        id="tb-info"     onclick="switchTab('info',this)">ℹ Details</button>
+    </div>
+
+    <div class="modal-content">
+
+      <!-- ── READ TAB ──────────────────────────────────────────────────────── -->
+      <div class="tab-panel active" id="tab-read">
+        <!-- Reader toolbar: font size, theme controls -->
+        <div class="read-toolbar">
+          <label>Size</label>
+          <select class="ctrl-select" onchange="setFontSize(this.value)">
+            <option value=".85rem">Small</option>
+            <option value="1rem" selected>Medium</option>
+            <option value="1.15rem">Large</option>
+            <option value="1.3rem">X-Large</option>
+          </select>
+
+          <label>Font</label>
+          <select class="ctrl-select" onchange="setReaderFont(this.value)">
+            <option value="'Lora', serif">Lora (Serif)</option>
+            <option value="'Space Mono', monospace">Mono</option>
+            <option value="system-ui, sans-serif">System</option>
+          </select>
+
+          <label>Theme</label>
+          <select class="ctrl-select" onchange="setReaderTheme(this.value)">
+            <option value="dark">Dark</option>
+            <option value="sepia">Sepia</option>
+            <option value="paper">Paper</option>
+          </select>
+
+          <!-- Progress indicator -->
+          <span class="progress-text" id="read-progress">0% read</span>
+        </div>
+
+        <!-- Progress bar: thin colored bar showing reading progress -->
+        <div class="reading-progress-bar">
+          <div class="reading-progress-fill" id="progress-fill" style="width:0%"></div>
+        </div>
+
+        <!-- The actual book text content goes here -->
+        <div class="reader-body" id="reader-body">
+          <div class="reader-loading">
+            <div class="spinner"></div>
+            Loading text…
+          </div>
+        </div>
+      </div>
+
+      <!-- ── DOWNLOAD TAB ──────────────────────────────────────────────────── -->
+      <div class="tab-panel" id="tab-download">
+        <div class="dl-panel">
+          <div class="dl-section-title">Available Formats</div>
+          <div class="dl-grid" id="dl-grid"></div>
+
+          <!-- Buy links shown when ebook formats aren't available -->
+          <div id="buy-section" style="display:none">
+            <div class="dl-section-title" style="margin-top:28px">📦 Purchase This Book</div>
+            <p style="font-size:.8rem;color:var(--muted);margin-bottom:16px">
+              This book may not be available for free. Find it on:
+            </p>
+            <div class="buy-links" id="buy-links"></div>
+          </div>
+
+          <div class="dl-section-title" style="margin-top:24px">Direct Download URLs</div>
+          <div id="dl-raw-links" style="font-size:.72rem;color:var(--muted);line-height:2.4"></div>
+        </div>
+      </div>
+
+      <!-- ── INFO TAB ──────────────────────────────────────────────────────── -->
+      <div class="tab-panel" id="tab-info">
+        <div class="dl-panel">
+          <div class="dl-section-title">Book Details</div>
+          <div class="book-details-grid" id="info-grid"></div>
+
+          <!-- Star rating widget -->
+          <% if (user) { %>
+          <div class="rating-section" id="rating-section" style="margin-top:24px">
+            <div class="dl-section-title">Your Rating</div>
+            <div class="star-rating" id="star-rating">
+              <% for(let i=1; i<=5; i++) { %>
+                <button class="star-btn" data-rating="<%= i %>" onclick="rateBook(<%= i %>)">☆</button>
+              <% } %>
+            </div>
+          </div>
+          <% } %>
+        </div>
+      </div>
+
+    </div><!-- end modal-content -->
+  </div><!-- end .modal -->
+</div><!-- end .modal-overlay -->
+
+<%- include('partials/footer') %>
+
+<!-- Page-specific data passed from server to JavaScript -->
+<!-- We serialize server-side data as JSON so JS can use it -->
+<script>
+  // Is the current user logged in? Used by app.js to show/hide features.
+  window.APP_USER = <%- user ? JSON.stringify({ id: user.id, username: user.username, preferences: user.preferences }) : 'null' %>;
+  window.APP_INITIAL_SEARCH = '<%= initialSearch || "Pride and Prejudice" %>';
+</script>
+<script src="/js/reader.js"></script>
+<script src="/js/books.js"></script>

@@ -1,0 +1,25 @@
+# Node dependencies
+node_modules/
+
+# Environment variables — NEVER commit this!
+.env
+
+# Prisma generated client
+prisma/generated/
+
+# Build outputs
+dist/
+build/
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
