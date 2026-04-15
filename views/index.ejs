@@ -345,7 +345,7 @@
       <!-- We serialize server-side data as JSON so JS can use it -->
       <script>
         // Is the current user logged in? Used by app.js to show/hide features.
-        window.APP_USER = <% - user ? JSON.stringify({ id: user.id, username: user.username, preferences: user.preferences }) : 'null' %>;
+        window.APP_USER = <%- user ? JSON.stringify({ id: user.id, username: user.username, preferences: user.preferences }) : 'null' %>;
         window.APP_INITIAL_SEARCH = '<%= "Pride and Prejudice" %>';
       </script>
       <script src="/js/reader.js"></script>
