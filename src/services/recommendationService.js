@@ -16,7 +16,7 @@
 // the content attributes (subjects) of books the user liked.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const { prisma }             = require('../utils/db');
+const { ReadingHistory } = require('../utils/db');
 const { getBooksBySubjects } = require('./gutenbergService');
 
 /**
@@ -33,10 +33,8 @@ const { getBooksBySubjects } = require('./gutenbergService');
  */
 async function getUserTasteProfile(userId) {
   // Get the user's reading history
-  const history = await prisma.readingHistory.findMany({
-    where: { userId },
-    select: { subjects: true, rating: true, completed: true }
-  });
+  const history = await ReadingHistory.find({ userId })
+    .select('subjects rating completed');
 
   if (history.length === 0) return {};
 
@@ -84,10 +82,8 @@ function getTopSubjects(tasteProfile, n = 3) {
 async function getRecommendations(userId, limit = 12) {
   try {
     // Step 1: Get the user's reading history (just the Gutenberg IDs)
-    const history = await prisma.readingHistory.findMany({
-      where: { userId },
-      select: { gutenbergId: true, subjects: true }
-    });
+    const history = await ReadingHistory.find({ userId })
+      .select('gutenbergId subjects');
 
     // If no reading history, return popular books instead
     if (history.length === 0) {

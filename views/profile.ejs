@@ -1,0 +1,186 @@
+<%# views/profile.ejs — Profile & Stats Page %>
+<%- include('partials/header', { title: 'Profile & Stats — Open Library Direct' }) %>
+
+<div class="page-hero">
+  <div class="page-hero-inner">
+    <div class="profile-avatar-large">
+      <% if (user.avatar) { %>
+        <img src="<%= user.avatar %>" alt="<%= user.username %>">
+      <% } else { %>
+        <span class="profile-initial-large"><%= user.username[0].toUpperCase() %></span>
+      <% } %>
+    </div>
+    <div class="profile-hero-info">
+      <h1 class="profile-username"><%= user.username %></h1>
+      <div class="profile-email"><%= user.email %></div>
+      <div class="profile-joined">Member since <%= new Date(user.createdAt || Date.now()).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }) %></div>
+    </div>
+  </div>
+</div>
+
+<main class="page-main">
+
+  <!-- STAT CARDS -->
+  <div class="dash-stats-row" id="profile-stats-row">
+    <div class="dash-stat-card">
+      <div class="dash-stat-icon">📚</div>
+      <div class="dash-stat-val" id="p-total-books">–</div>
+      <div class="dash-stat-lbl">Books Opened</div>
+    </div>
+    <div class="dash-stat-card">
+      <div class="dash-stat-icon">✅</div>
+      <div class="dash-stat-val" id="p-completed">–</div>
+      <div class="dash-stat-lbl">Completed</div>
+    </div>
+    <div class="dash-stat-card">
+      <div class="dash-stat-icon">🔥</div>
+      <div class="dash-stat-val" id="p-streak">–</div>
+      <div class="dash-stat-lbl">Day Streak</div>
+    </div>
+    <div class="dash-stat-card">
+      <div class="dash-stat-icon">⏱️</div>
+      <div class="dash-stat-val" id="p-hours">–</div>
+      <div class="dash-stat-lbl">Hours Read</div>
+    </div>
+    <div class="dash-stat-card">
+      <div class="dash-stat-icon">📅</div>
+      <div class="dash-stat-val" id="p-today">–</div>
+      <div class="dash-stat-lbl">Read Today</div>
+    </div>
+  </div>
+
+  <!-- 7-DAY CHART -->
+  <div class="dash-section">
+    <div class="dash-section-title">📈 Reading Activity — Last 7 Days</div>
+    <div class="dash-bar-chart-wrap">
+      <div id="profile-bar-chart" class="dash-bar-chart">
+        <div class="dash-loading"><div class="spinner"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- READING GOALS SUMMARY -->
+  <div class="dash-section">
+    <div class="dash-section-header">
+      <div class="dash-section-title">🎯 Reading Goals</div>
+      <a href="/goals" class="dash-btn dash-btn-primary" style="font-size:.7rem;padding:7px 14px;text-decoration:none">Manage Goals →</a>
+    </div>
+    <div id="profile-goals-list">
+      <div class="dash-loading"><div class="spinner"></div></div>
+    </div>
+  </div>
+
+  <!-- RECENTLY READ -->
+  <div class="dash-section">
+    <div class="dash-section-header">
+      <div class="dash-section-title">📖 Recently Read</div>
+      <a href="/history" class="dash-btn dash-btn-primary" style="font-size:.7rem;padding:7px 14px;text-decoration:none">Full History →</a>
+    </div>
+    <div id="profile-history-list">
+      <div class="dash-loading"><div class="spinner"></div></div>
+    </div>
+  </div>
+
+</main>
+
+<%- include('partials/footer') %>
+
+<script>
+(async function() {
+  try {
+    const res  = await fetch('/api/user/stats');
+    const data = await res.json();
+
+    document.getElementById('p-total-books').textContent = data.totalBooks       || 0;
+    document.getElementById('p-completed').textContent   = data.completedBooks   || 0;
+    document.getElementById('p-streak').textContent      = (data.currentStreak   || 0) + ' 🔥';
+    document.getElementById('p-hours').textContent       = (data.totalHours      || 0) + 'h';
+    document.getElementById('p-today').textContent       = (data.minutesReadToday|| 0) + ' min';
+
+    // Bar chart
+    renderProfileBarChart(data.last7DaysLogs || []);
+
+    // Goals
+    renderProfileGoals(data.goals || []);
+  } catch (e) {}
+
+  // Recently read (last 5)
+  try {
+    const res  = await fetch('/api/user/history');
+    const hist = await res.json();
+    const list = document.getElementById('profile-history-list');
+    if (!hist.length) {
+      list.innerHTML = '<div class="dash-empty"><div class="dash-empty-icon">📭</div><p>No reading history yet.</p></div>';
+      return;
+    }
+    list.innerHTML = hist.slice(0, 5).map(item => {
+      const prog = item.progressPercent || 0;
+      const cover = item.coverUrl
+        ? `<img src="${item.coverUrl}" class="hist-cover" alt="" onerror="this.style.display='none'">`
+        : `<div class="hist-cover-placeholder">📚</div>`;
+      const badge = item.completed
+        ? `<span class="hist-badge hist-badge-done">✓ Completed</span>`
+        : prog > 0 ? `<span class="hist-badge hist-badge-progress">${prog}% read</span>`
+                   : `<span class="hist-badge hist-badge-new">New</span>`;
+      return `<div class="hist-item">
+        ${cover}
+        <div class="hist-details">
+          <div class="hist-title">${item.title}</div>
+          <div class="hist-author">by ${item.author || 'Unknown'}</div>
+          <div class="hist-meta">${badge}</div>
+          <div class="hist-prog-wrap"><div class="hist-prog-bar"><div class="hist-prog-fill" style="width:${prog}%"></div></div></div>
+        </div>
+        <a href="/" class="hist-resume-btn" onclick="event.preventDefault(); window.location='/'">▶ Continue</a>
+      </div>`;
+    }).join('');
+  } catch (e) {}
+})();
+
+function renderProfileBarChart(logs) {
+  const container = document.getElementById('profile-bar-chart');
+  if (!container) return;
+  const logMap = {};
+  logs.forEach(l => { logMap[new Date(l.date).toDateString()] = l.minutesRead || 0; });
+  const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const maxMins = Math.max(1, ...Object.values(logMap));
+  let html = '';
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const key = d.toDateString();
+    const mins = logMap[key] || 0;
+    const pct = Math.round((mins / maxMins) * 100);
+    html += `<div class="bar-col">
+      <div class="bar-wrap" title="${mins} min"><div class="bar-fill ${mins>0?'active':''}" style="height:${pct}%"></div></div>
+      <div class="bar-label">${i===0?'Today':days[d.getDay()]}</div>
+      <div class="bar-mins">${mins>0?mins+'m':''}</div>
+    </div>`;
+  }
+  container.innerHTML = html;
+}
+
+function renderProfileGoals(goals) {
+  const container = document.getElementById('profile-goals-list');
+  const meta = { books_per_month:{label:'Books/Month',icon:'📅'}, books_per_year:{label:'Books/Year',icon:'📆'}, minutes_per_day:{label:'Mins/Day',icon:'⏱️'} };
+  if (!goals.length) {
+    container.innerHTML = '<div class="dash-empty"><div class="dash-empty-icon">🎯</div><p>No goals yet. <a href="/goals">Set one →</a></p></div>';
+    return;
+  }
+  container.innerHTML = goals.map(g => {
+    const m = meta[g.type] || {label: g.type, icon:'📖'};
+    const pct = g.progressPercent || 0;
+    return `<div class="goal-card ${g.achieved?'goal-achieved':''}">
+      <div class="goal-card-header">
+        <span class="goal-icon">${m.icon}</span>
+        <div class="goal-info">
+          <div class="goal-label">${m.label}</div>
+          <div class="goal-progress-text">${g.achieved?'🏆 Achieved!':g.current+' / '+g.target}</div>
+        </div>
+      </div>
+      <div class="goal-progress-bar-wrap">
+        <div class="goal-progress-bar"><div class="goal-progress-fill ${g.achieved?'fill-achieved':''}" style="width:${pct}%"></div></div>
+        <span class="goal-pct">${pct}%</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+</script>

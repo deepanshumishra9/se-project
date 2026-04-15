@@ -1,30 +1,40 @@
-// src/utils/db.js
-// ─────────────────────────────────────────────────────────────────────────────
-// DATABASE CONNECTION UTILITY
-//
-// We create a single PrismaClient instance and reuse it everywhere.
-// Why? Because creating a new database connection for every request is
-// expensive (slow). A single shared "pool" of connections is much faster.
-//
-// The "global" trick prevents creating multiple instances during hot reloads
-// in development (when nodemon restarts the server, we reuse the same client).
-// ─────────────────────────────────────────────────────────────────────────────
+const mongoose = require('mongoose');
 
-const { PrismaClient } = require('@prisma/client');
+// Import models so they can be exported from this central utility if desired
+const User = require('../models/User');
+const ReadingHistory = require('../models/ReadingHistory');
+const Bookmark = require('../models/Bookmark');
+const Notification = require('../models/Notification');
+const ReadingGoal = require('../models/ReadingGoal');
+const DailyReadingLog = require('../models/DailyReadingLog');
+const ReadingReminder = require('../models/ReadingReminder');
 
-// In development, store the client on the global object
-// so hot reloads don't create a new connection every time
-const globalForPrisma = globalThis;
+/**
+ * connectDB — Establishes connection to MongoDB using the URI from .env
+ */
+const connectDB = async () => {
+  const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/ebook-library';
+  
+  try {
+    const conn = await mongoose.connect(uri);
+    console.log(`\n🍃 MongoDB Connected: ${conn.connection.host}`);
+    return conn;
+  } catch (err) {
+    console.error(`\n❌ MongoDB Connection Error: ${err.message}`);
+    process.exit(1);
+  }
+};
 
-const prisma = globalForPrisma.prisma ?? new PrismaClient({
-  // Log slow queries in development so you can optimize them
-  log: process.env.NODE_ENV === 'development'
-    ? ['warn', 'error']
-    : ['error']
-});
-
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma;
-}
-
-module.exports = { prisma };
+// For backward compatibility during migration, we can export a mock/proxy 
+// or just export the models directly.
+// Given we are refactoring all files, we will export named models.
+module.exports = {
+  connectDB,
+  User,
+  ReadingHistory,
+  Bookmark,
+  Notification,
+  ReadingGoal,
+  DailyReadingLog,
+  ReadingReminder
+};

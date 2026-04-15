@@ -10,26 +10,27 @@
 // This MUST be called first, before anything else!
 require('dotenv').config();
 
-const express       = require('express');
-const session       = require('express-session');
-const passport      = require('passport');
-const flash         = require('express-flash');
+const express = require('express');
+const session = require('express-session');
+const passport = require('passport');
+const flash = require('express-flash');
 const methodOverride = require('method-override');
-const morgan        = require('morgan');
-const compression   = require('compression');
-const path          = require('path');
+const morgan = require('morgan');
+const compression = require('compression');
+const path = require('path');
 
 // Our custom modules (we'll create each of these)
-const { prisma }           = require('./utils/db');
-const passportConfig       = require('./middleware/passport');
-const authRoutes            = require('./routes/auth');
-const bookRoutes            = require('./routes/books');
-const userRoutes            = require('./routes/user');
-const notificationRoutes    = require('./routes/notifications');
-const { startCronJobs }     = require('./services/cronService');
+const { connectDB } = require('./utils/db');
+const { MongoStore } = require('connect-mongo');
+const passportConfig = require('./middleware/passport');
+const authRoutes = require('./routes/auth');
+const bookRoutes = require('./routes/books');
+const userRoutes = require('./routes/user');
+const notificationRoutes = require('./routes/notifications');
+const { startCronJobs } = require('./services/cronService');
 
 // ── CREATE EXPRESS APP ────────────────────────────────────────────────────────
-const app  = express();
+const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ── VIEW ENGINE SETUP ─────────────────────────────────────────────────────────
@@ -69,11 +70,15 @@ app.use(express.static(path.join(__dirname, '../public')));
 // The session is stored server-side; the user gets a cookie with a session ID.
 app.use(session({
   secret: process.env.SESSION_SECRET || 'dev-secret-change-me',
-  resave: false,              // Don't re-save session if nothing changed
-  saveUninitialized: false,   // Don't create session until something is stored
+  resave: false,
+  saveUninitialized: false,
+  store: MongoStore.create({
+    mongoUrl: process.env.MONGODB_URI || 'mongodb://localhost:27017/ebook-library',
+    collectionName: 'sessions'
+  }),
   cookie: {
-    secure: process.env.NODE_ENV === 'production', // HTTPS only in production
-    maxAge: 7 * 24 * 60 * 60 * 1000               // 7 days in milliseconds
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 7 * 24 * 60 * 60 * 1000
   }
 }));
 
@@ -93,28 +98,44 @@ app.use(flash());
 // These variables are available in EVERY EJS template automatically.
 // res.locals = the "global store" for a single request.
 app.use((req, res, next) => {
-  res.locals.user            = req.user || null;  // Currently logged-in user (or null)
+  res.locals.user = req.user || null;  // Currently logged-in user (or null)
   res.locals.success_messages = req.flash('success');
-  res.locals.error_messages   = req.flash('error');
+  res.locals.error_messages = req.flash('error');
   next(); // "next()" means "I'm done, pass to the next middleware"
 });
 
 // ── ROUTES ────────────────────────────────────────────────────────────────────
 // Routes define WHAT HAPPENS when a user visits a URL.
 // We split them into separate files to keep things organized.
-app.use('/auth',          authRoutes);          // /auth/login, /auth/register, /auth/google
-app.use('/api/books',     bookRoutes);          // /api/books/search, /api/books/read/:id
-app.use('/api/user',      userRoutes);          // /api/user/history, /api/user/bookmarks
+app.use('/auth', authRoutes);          // /auth/login, /auth/register, /auth/google
+app.use('/api/books', bookRoutes);          // /api/books/search, /api/books/read/:id
+app.use('/api/user', userRoutes);          // /api/user/history, /api/user/bookmarks
 app.use('/api/notifications', notificationRoutes); // /api/notifications
 
-// ── MAIN PAGE ROUTE ────────────────────────────────────────────────────────────
+const { requireAuth } = require('./middleware/auth');
+
+// ── PAGE ROUTES ────────────────────────────────────────────────────────────────
 // When someone visits the root URL "/", render the main app page
 app.get('/', (req, res) => {
   res.render('index', {
-    title: 'Open Library Direct',
-    // Pass any initial data the page needs
-    initialSearch: 'Pride and Prejudice'
+    title: 'Open Library Direct'
   });
+});
+
+app.get('/profile', requireAuth, (req, res) => {
+  res.render('profile');
+});
+
+app.get('/history', requireAuth, (req, res) => {
+  res.render('history');
+});
+
+app.get('/goals', requireAuth, (req, res) => {
+  res.render('goals');
+});
+
+app.get('/bookmarks', requireAuth, (req, res) => {
+  res.render('bookmarks');
 });
 
 // ── 404 HANDLER ───────────────────────────────────────────────────────────────
@@ -155,11 +176,11 @@ app.listen(PORT, async () => {
 
   // Test database connection
   try {
-    await prisma.$connect();
+    await connectDB();
     console.log('🗄️  Database connected successfully');
   } catch (err) {
     console.error('❌ Database connection failed:', err.message);
-    console.log('   Make sure PostgreSQL is running and DATABASE_URL is set in .env');
+    console.log('   Make sure MongoDB is running and MONGODB_URI is set in .env');
   }
 });
 

@@ -12,7 +12,7 @@
 const express  = require('express');
 const passport = require('passport');
 const bcrypt   = require('bcryptjs');
-const { prisma } = require('../utils/db');
+const { User } = require('../utils/db');
 const { redirectIfLoggedIn } = require('../middleware/auth');
 
 const router = express.Router();
@@ -52,8 +52,8 @@ router.post('/register', redirectIfLoggedIn, async (req, res) => {
     }
 
     // ── CHECK FOR EXISTING USERS ──────────────────────────────────────────────
-    const existingEmail    = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
-    const existingUsername = await prisma.user.findUnique({ where: { username } });
+    const existingEmail    = await User.findOne({ email: email.toLowerCase() });
+    const existingUsername = await User.findOne({ username });
 
     if (existingEmail) {
       req.flash('error', 'An account with that email already exists.');
@@ -72,12 +72,10 @@ router.post('/register', redirectIfLoggedIn, async (req, res) => {
     const passwordHash = await bcrypt.hash(password, 12);
 
     // ── CREATE USER ────────────────────────────────────────────────────────────
-    const user = await prisma.user.create({
-      data: {
-        email: email.toLowerCase().trim(),
-        username: username.trim(),
-        passwordHash
-      }
+    const user = await User.create({
+      email: email.toLowerCase().trim(),
+      username: username.trim(),
+      passwordHash
     });
 
     // ── LOG THEM IN AUTOMATICALLY ──────────────────────────────────────────────

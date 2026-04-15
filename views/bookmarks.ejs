@@ -1,0 +1,85 @@
+<%# views/bookmarks.ejs — My Bookmarks Page %>
+<%- include('partials/header', { title: 'My Bookmarks — Open Library Direct' }) %>
+
+<div class="page-hero page-hero-sm">
+  <div class="page-hero-inner">
+    <div>
+      <h1 class="page-title">🔖 My Bookmarks</h1>
+      <p class="page-subtitle">Books you've saved to read later.</p>
+    </div>
+  </div>
+</div>
+
+<main class="page-main">
+  <div class="dash-section" style="max-width:1200px;margin:24px auto;">
+    <div id="full-bookmarks-list">
+      <div class="dash-loading"><div class="spinner"></div>Loading bookmarks…</div>
+    </div>
+  </div>
+</main>
+
+<%- include('partials/footer') %>
+
+<script>
+async function loadBookmarks() {
+  const container = document.getElementById('full-bookmarks-list');
+  try {
+    const res  = await fetch('/api/user/bookmarks');
+    const data = await res.json();
+    
+    if (!data.length) {
+      container.innerHTML = `
+        <div class="dash-empty" style="padding:60px 0">
+          <div class="dash-empty-icon">🔖</div>
+          <p>You haven't bookmarked any books yet.</p>
+          <a href="/" class="dash-btn dash-btn-primary" style="display:inline-block;margin-top:16px;text-decoration:none">Find books to read</a>
+        </div>`;
+      return;
+    }
+    
+    container.innerHTML = data.map(item => {
+      const cover = item.coverUrl
+        ? `<img src="${item.coverUrl}" class="hist-cover" alt="" onerror="this.style.display='none'">`
+        : `<div class="hist-cover-placeholder">📚</div>`;
+        
+      const saved = new Date(item.savedAt || Date.now()).toLocaleDateString('en-IN', {
+        day: 'numeric', month: 'short', year: 'numeric'
+      });
+        
+      return `
+        <div class="hist-item-full" id="bkmk-${item.gutenbergId}" style="border-bottom:1px solid var(--border);padding:16px 0;display:flex;gap:20px;align-items:center">
+          ${cover}
+          <div class="hist-details" style="flex:1">
+            <div class="hist-title" style="font-size:1.1rem;margin-bottom:4px">${escHtml(item.title)}</div>
+            <div class="hist-author" style="font-size:.8rem">by ${escHtml(item.author || 'Unknown')}</div>
+            <div class="hist-meta" style="margin-top:8px">
+              <span class="hist-date">Saved on ${saved}</span>
+            </div>
+          </div>
+          <div class="hist-actions" style="display:flex;gap:12px">
+            <a href="/" class="dash-btn dash-btn-primary" style="text-decoration:none">▶ Open Read</a>
+            <button class="hist-del-btn" style="padding:10px 16px" onclick="removeBookmark(${item.gutenbergId})">✕ Remove</button>
+          </div>
+        </div>`;
+    }).join('');
+    
+  } catch (e) {
+    container.innerHTML = '<div class="dash-empty">Failed to load bookmarks.</div>';
+  }
+}
+loadBookmarks();
+
+async function removeBookmark(id) {
+  if (!confirm('Remove this bookmark?')) return;
+  try {
+    const res = await fetch(`/api/user/bookmarks/${id}`, { method: 'DELETE' });
+    if (res.ok) {
+      document.getElementById(`bkmk-${id}`)?.remove();
+      const list = document.getElementById('full-bookmarks-list');
+      if (list.children.length === 0) loadBookmarks(); // show empty state
+    }
+  } catch (err) {}
+}
+
+function escHtml(str) { return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>

@@ -8,7 +8,7 @@
 //   2. Email notifications  — sent via Nodemailer (optional, requires email config)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const { prisma }    = require('../utils/db');
+const { Notification } = require('../utils/db');
 const nodemailer    = require('nodemailer');
 
 // ── EMAIL TRANSPORTER ─────────────────────────────────────────────────────────
@@ -49,22 +49,18 @@ const TYPES = {
  */
 async function createNotification({ userId, type, title, body, link = null }) {
   try {
-    const notification = await prisma.notification.create({
-      data: { userId, type, title, body, link }
-    });
+    const notification = await Notification.create({ userId, type, title, body, link });
 
     // Delete old notifications to prevent the database from growing forever
     // Keep only the 50 most recent per user
-    const oldOnes = await prisma.notification.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      skip: 50,
-      select: { id: true }
-    });
+    const oldOnes = await Notification.find({ userId })
+      .sort({ createdAt: -1 })
+      .skip(50)
+      .select('_id');
 
     if (oldOnes.length > 0) {
-      await prisma.notification.deleteMany({
-        where: { id: { in: oldOnes.map(n => n.id) } }
+      await Notification.deleteMany({
+        _id: { $in: oldOnes.map(n => n._id) }
       });
     }
 
@@ -156,8 +152,9 @@ async function notifyAchievement(userId, achievement) {
  * @returns {number}
  */
 async function getUnreadCount(userId) {
-  return prisma.notification.count({
-    where: { userId, read: false }
+  return Notification.countDocuments({
+    userId,
+    read: false
   });
 }
 

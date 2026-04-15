@@ -1,0 +1,136 @@
+<%# views/goals.ejs — Reading Goals Page %>
+<%- include('partials/header', { title: 'Reading Goals — Open Library Direct' }) %>
+
+<div class="page-hero page-hero-sm">
+  <div class="page-hero-inner">
+    <div>
+      <h1 class="page-title">🎯 Reading Goals</h1>
+      <p class="page-subtitle">Set monthly, yearly, or daily reading targets and track your consistency.</p>
+    </div>
+  </div>
+</div>
+
+<main class="page-main">
+
+  <div class="dash-two-col" style="max-width:1200px;margin:24px auto;">
+    
+    <!-- LEFT: CURRENT GOALS -->
+    <div class="dash-section" style="margin-top:0">
+      <div class="dash-section-title">My Goals</div>
+      <div id="full-goals-list">
+        <div class="dash-loading"><div class="spinner"></div>Loading goals…</div>
+      </div>
+    </div>
+
+    <!-- RIGHT: ADD GOAL FORM -->
+    <div class="dash-section" style="margin-top:0">
+      <div class="dash-section-title">➕ Set a New Goal</div>
+      <p class="dash-hint" style="margin-bottom:20px">Choose what kind of goal you want to track and set a target number. Setting a new goal of the same type will replace the old one.</p>
+      
+      <form class="dash-goal-form" onsubmit="createNewGoal(event)" style="display:flex;flex-direction:column;gap:16px">
+        <div>
+          <label class="dash-label">Goal Type</label>
+          <select id="new-goal-type" class="dash-select" style="width:100%" required>
+            <option value="books_per_month">📅 Books per Month</option>
+            <option value="books_per_year">📆 Books per Year</option>
+            <option value="minutes_per_day">⏱️ Minutes per Day</option>
+          </select>
+        </div>
+        <div>
+          <label class="dash-label">Target</label>
+          <input type="number" id="new-goal-target" class="dash-input" style="width:100%" placeholder="e.g. 5" min="1" required>
+        </div>
+        <button type="submit" class="dash-btn dash-btn-primary" style="margin-top:8px">💾 Save Goal</button>
+      </form>
+    </div>
+    
+  </div>
+
+</main>
+
+<%- include('partials/footer') %>
+
+<script>
+async function loadGoals() {
+  try {
+    const res  = await fetch('/api/user/goals');
+    const data = await res.json();
+    renderGoalsList(data);
+  } catch (e) {
+    document.getElementById('full-goals-list').innerHTML = '<div class="dash-empty">Failed to load goals.</div>';
+  }
+}
+loadGoals();
+
+function renderGoalsList(goals) {
+  const container = document.getElementById('full-goals-list');
+  const meta = {
+    books_per_month: { label: 'Books per Month', icon: '📅', unit: 'books' },
+    books_per_year:  { label: 'Books per Year',  icon: '📆', unit: 'books' },
+    minutes_per_day: { label: 'Minutes per Day', icon: '⏱️', unit: 'minutes' }
+  };
+  
+  if (!goals.length) {
+    container.innerHTML = `
+      <div class="dash-empty" style="padding:40px 0">
+        <div class="dash-empty-icon">🎯</div>
+        <p>You haven't set any reading goals yet.</p>
+        <p style="font-size:.7rem;margin-top:8px">Use the form to get started!</p>
+      </div>`;
+    return;
+  }
+  
+  container.innerHTML = goals.map(g => {
+    const m = meta[g.type] || { label: g.type, icon: '📖', unit: '' };
+    const pct = g.progressPercent || 0;
+    return `
+      <div class="goal-card ${g.achieved ? 'goal-achieved' : ''}" style="margin-bottom:16px;padding:20px 16px">
+        <div class="goal-card-header">
+          <span class="goal-icon" style="font-size:1.6rem">${m.icon}</span>
+          <div class="goal-info">
+            <div class="goal-label" style="font-size:.85rem">${m.label}</div>
+            <div class="goal-progress-text" style="font-size:.75rem;margin-top:4px">
+              ${g.achieved ? '🏆 Goal Achieved!' : `${g.current} / ${g.target} ${m.unit}`}
+            </div>
+          </div>
+          <button class="goal-delete-btn" onclick="deleteMyGoal('${g._id || g.id}')" style="padding:6px 10px">✕ Remove</button>
+        </div>
+        <div class="goal-progress-bar-wrap" style="margin-top:16px">
+          <div class="goal-progress-bar" style="height:8px"><div class="goal-progress-fill ${g.achieved ? 'fill-achieved' : ''}" style="width:${pct}%"></div></div>
+          <span class="goal-pct" style="font-size:.75rem;width:40px">${pct}%</span>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function createNewGoal(e) {
+  e.preventDefault();
+  const type   = document.getElementById('new-goal-type').value;
+  const target = document.getElementById('new-goal-target').value;
+  const period = type === 'minutes_per_day' ? 'daily' : (type === 'books_per_month' ? 'monthly' : 'yearly');
+  
+  if (!target || target < 1) return alert('Enter a valid target');
+  
+  try {
+    const res = await fetch('/api/user/goals', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, target, period })
+    });
+    if (res.ok) {
+      document.getElementById('new-goal-target').value = '';
+      loadGoals();
+    } else {
+      alert('Failed to create goal');
+    }
+  } catch (err) { alert('Network error'); }
+}
+
+async function deleteMyGoal(id) {
+  if (!confirm('Remove this goal?')) return;
+  try {
+    const res = await fetch(`/api/user/goals/${id}`, { method: 'DELETE' });
+    if (res.ok) loadGoals();
+  } catch (err) {}
+}
+</script>

@@ -15,7 +15,7 @@
 const LocalStrategy  = require('passport-local').Strategy;
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const bcrypt         = require('bcryptjs');
-const { prisma }     = require('../utils/db');
+const { User }       = require('../utils/db');
 
 module.exports = function configurePassport(passport) {
 
@@ -33,7 +33,7 @@ module.exports = function configurePassport(passport) {
   // to get the full user object. The result goes into req.user.
   passport.deserializeUser(async (id, done) => {
     try {
-      const user = await prisma.user.findUnique({ where: { id } });
+      const user = await User.findById(id);
       done(null, user); // user is now available as req.user in every route
     } catch (err) {
       done(err, null);
@@ -49,9 +49,7 @@ module.exports = function configurePassport(passport) {
     async (email, password, done) => {
       try {
         // Step 1: Find the user by email
-        const user = await prisma.user.findUnique({
-          where: { email: email.toLowerCase().trim() }
-        });
+        const user = await User.findOne({ email: email.toLowerCase().trim() });
 
         // Step 2: If no user found, authentication fails
         if (!user) {
@@ -109,9 +107,7 @@ module.exports = function configurePassport(passport) {
         }
 
         // Check if a user with this Google ID already exists
-        let user = await prisma.user.findUnique({
-          where: { googleId }
-        });
+        let user = await User.findOne({ googleId });
 
         if (user) {
           // Returning Google user — just log them in
@@ -119,26 +115,22 @@ module.exports = function configurePassport(passport) {
         }
 
         // Maybe they previously registered with email?
-        user = await prisma.user.findUnique({ where: { email } });
+        user = await User.findOne({ email });
 
         if (user) {
           // Link their Google account to existing email account
-          user = await prisma.user.update({
-            where: { id: user.id },
-            data: { googleId, avatar: avatar || user.avatar }
-          });
+          user.googleId = googleId;
+          if (avatar) user.avatar = avatar;
+          await user.save();
           return done(null, user);
         }
 
         // Brand new user — create an account for them
-        user = await prisma.user.create({
-          data: {
-            email,
-            username:  profile.displayName?.replace(/\s+/g, '_').toLowerCase() || `user_${googleId.slice(-6)}`,
-            googleId,
-            avatar,
-            // No passwordHash — this user logs in via Google only
-          }
+        user = await User.create({
+          email,
+          username: profile.displayName?.replace(/\s+/g, '_').toLowerCase() || `user_${googleId.slice(-6)}`,
+          googleId,
+          avatar
         });
 
         return done(null, user);

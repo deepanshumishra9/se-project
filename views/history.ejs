@@ -1,0 +1,168 @@
+<%# views/history.ejs — Full Reading History Page %>
+<%- include('partials/header', { title: 'Reading History — Open Library Direct' }) %>
+
+<div class="page-hero page-hero-sm">
+  <div class="page-hero-inner">
+    <div>
+      <h1 class="page-title">📖 Reading History</h1>
+      <p class="page-subtitle">Every book you've opened, with your progress saved.</p>
+    </div>
+    <button class="dash-btn dash-btn-danger" id="clear-all-btn" onclick="clearAllHistory()">
+      🗑 Clear All History
+    </button>
+  </div>
+</div>
+
+<main class="page-main">
+
+  <!-- Filter bar -->
+  <div class="hist-filter-bar">
+    <button class="hist-filter-btn active" data-filter="all"    onclick="filterHistory('all', this)">All</button>
+    <button class="hist-filter-btn"        data-filter="progress" onclick="filterHistory('progress', this)">📖 In Progress</button>
+    <button class="hist-filter-btn"        data-filter="done"   onclick="filterHistory('done', this)">✅ Completed</button>
+  </div>
+
+  <!-- Stats row -->
+  <div class="hist-summary-bar" id="hist-summary" style="display:none">
+    <span id="hist-count-text"></span>
+  </div>
+
+  <!-- History list -->
+  <div class="dash-section" style="margin-top:12px">
+    <div id="full-history-list">
+      <div class="dash-loading"><div class="spinner"></div>Loading your reading history…</div>
+    </div>
+  </div>
+
+</main>
+
+<%- include('partials/footer') %>
+
+<script>
+let allHistory = [];
+
+(async function loadHistory() {
+  try {
+    const res  = await fetch('/api/user/history');
+    allHistory = await res.json();
+    renderHistory(allHistory);
+  } catch (e) {
+    document.getElementById('full-history-list').innerHTML =
+      '<div class="dash-empty"><div class="dash-empty-icon">⚠️</div><p>Failed to load history.</p></div>';
+  }
+})();
+
+function renderHistory(items) {
+  const container = document.getElementById('full-history-list');
+  const summary   = document.getElementById('hist-summary');
+  const countText = document.getElementById('hist-count-text');
+
+  if (!items.length) {
+    summary.style.display = 'none';
+    container.innerHTML = `
+      <div class="dash-empty">
+        <div class="dash-empty-icon">📭</div>
+        <p>No books here yet.</p>
+        <a href="/" class="dash-btn dash-btn-primary" style="display:inline-block;margin-top:12px;text-decoration:none">Browse Books →</a>
+      </div>`;
+    return;
+  }
+
+  summary.style.display = 'block';
+  countText.textContent = `${items.length} book${items.length !== 1 ? 's' : ''}`;
+
+  container.innerHTML = items.map(item => {
+    const prog  = item.progressPercent || 0;
+    const cover = item.coverUrl
+      ? `<img src="${item.coverUrl}" class="hist-cover" alt="" onerror="this.style.display='none'">`
+      : `<div class="hist-cover-placeholder">📚</div>`;
+
+    const badge = item.completed
+      ? `<span class="hist-badge hist-badge-done">✓ Completed</span>`
+      : prog > 0 ? `<span class="hist-badge hist-badge-progress">${prog}% read</span>`
+                 : `<span class="hist-badge hist-badge-new">New</span>`;
+
+    const lastRead = new Date(item.lastReadAt).toLocaleDateString('en-IN', {
+      day:'numeric', month:'short', year:'numeric'
+    });
+
+    const mins = Math.floor((item.totalReadSeconds || 0) / 60);
+    const timeStr = mins > 60
+      ? `${Math.floor(mins/60)}h ${mins % 60}m`
+      : `${mins}m`;
+
+    const stars = item.rating
+      ? '★'.repeat(item.rating) + '☆'.repeat(5 - item.rating)
+      : '';
+
+    return `
+      <div class="hist-item-full" id="histful-${item.gutenbergId}">
+        ${cover}
+        <div class="hist-details">
+          <div class="hist-title">${escHtml(item.title)}</div>
+          <div class="hist-author">by ${escHtml(item.author || 'Unknown')}</div>
+          <div class="hist-meta">
+            ${badge}
+            <span class="hist-date">Last read: ${lastRead}</span>
+            ${mins > 0 ? `<span class="hist-date">⏱ ${timeStr} total</span>` : ''}
+            ${stars ? `<span class="hist-stars">${stars}</span>` : ''}
+          </div>
+          <div class="hist-prog-wrap">
+            <div class="hist-prog-bar">
+              <div class="hist-prog-fill" style="width:${prog}%"></div>
+            </div>
+            <span style="font-size:.65rem;color:var(--muted);margin-left:6px">${prog}%</span>
+          </div>
+          ${(item.subjects||[]).length ? `<div class="hist-subjects">${item.subjects.slice(0,3).map(s=>`<span class="subject-chip">${escHtml(s)}</span>`).join('')}</div>` : ''}
+        </div>
+        <div class="hist-actions">
+          <a href="/" class="hist-resume-btn" onclick="event.preventDefault(); window.location='/'">▶ Resume</a>
+          <button class="hist-del-btn" onclick="deleteHistItem(${item.gutenbergId})">✕ Remove</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function filterHistory(filter, btn) {
+  document.querySelectorAll('.hist-filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  let filtered = allHistory;
+  if (filter === 'progress') filtered = allHistory.filter(h => !h.completed && h.progressPercent > 0);
+  if (filter === 'done')     filtered = allHistory.filter(h => h.completed);
+  renderHistory(filtered);
+}
+
+async function deleteHistItem(gutenbergId) {
+  if (!confirm('Remove this book from history?')) return;
+  try {
+    await fetch(`/api/user/history/${gutenbergId}`, { method: 'DELETE' });
+    allHistory = allHistory.filter(h => h.gutenbergId !== gutenbergId);
+    document.getElementById(`histful-${gutenbergId}`)?.remove();
+    showPageToast('✓ Removed from history.', 'info');
+  } catch (e) { showPageToast('❌ Failed to remove.', 'error'); }
+}
+
+async function clearAllHistory() {
+  if (!confirm('Clear ALL reading history? This cannot be undone.')) return;
+  try {
+    await fetch('/api/user/history', { method: 'DELETE' });
+    allHistory = [];
+    renderHistory([]);
+    showPageToast('✓ History cleared.', 'info');
+  } catch (e) { showPageToast('❌ Failed.', 'error'); }
+}
+
+function showPageToast(msg, type) {
+  const t = document.createElement('div');
+  t.className = `toast toast-${type} toast-show`;
+  t.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:9999;pointer-events:all';
+  t.innerHTML = `<span class="toast-msg">${msg}</span>`;
+  document.body.appendChild(t);
+  setTimeout(() => { t.classList.remove('toast-show'); setTimeout(() => t.remove(), 400); }, 3000);
+}
+
+function escHtml(str) {
+  return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>

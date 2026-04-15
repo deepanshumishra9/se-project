@@ -252,7 +252,7 @@ async function saveProgressServer(book) {
   readingStartTime = Date.now(); // Reset timer
 
   try {
-    await fetch(`/api/books/${book.id}/progress`, {
+    const res  = await fetch(`/api/books/${book.id}/progress`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({
@@ -264,6 +264,21 @@ async function saveProgressServer(book) {
         subjects: book.subjects || []
       })
     });
+
+    if (res.ok) {
+      const data = await res.json();
+      // Show a toast for each newly achieved goal
+      if (data.goalAchieved && data.goalAchieved.length > 0 && window.showToast) {
+        data.goalAchieved.forEach(g => {
+          const labelMap = {
+            minutes_per_day: `🏆 Daily reading goal hit — ${g.target} minutes!`,
+            books_per_month: `🏆 Monthly book goal reached — ${g.target} books!`,
+            books_per_year:  `🏆 Yearly book goal smashed — ${g.target} books!`
+          };
+          window.showToast(labelMap[g.type] || '🏆 Goal Achieved!', 'success', 5000);
+        });
+      }
+    }
   } catch (err) {
     // Silently fail — progress is still saved in localStorage
     console.debug('Server progress save failed:', err);
